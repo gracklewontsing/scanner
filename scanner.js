@@ -17,26 +17,25 @@ var token_dict = new Map();
   token_dict.set(9,"number")
   token_dict.set(10,"comment")
   token_dict.set(11,"symbol")
-  token_dict.set(12,"symbol")
-  token_dict.set(13,"symbol")
+  token_dict.set(12,"specialsym")  
   
 //declare transition table
 var transition_table = [
   //w d  +  -  *  /  (  )  [  ]  {  }  ,  ;  <  >  !  = del any
-  [1 ,2 ,12,12,12,3 ,12,12,12,12,12,12,12,12,6 ,6 ,7 ,6 ,0 ,14], //state 0
-  [1 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,14,8 ,8 ,14], //state 1
-  [9 ,2 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,14,9 ,9 ,14], //state 2
-  [11,11,11,11,4 ,11,11,11,11,11,11,11,11,11,11,11,14,11,11,14], //state 3
+  [1 ,2 ,11,11,11,3 ,11,11,11,11,11,11,11,11,6 ,6 ,7 ,6 ,0 ,13], //state 0
+  [1 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,8 ,13,8 ,8 ,13], //state 1
+  [9 ,2 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,9 ,13,9 ,9 ,13], //state 2
+  [11,11,11,11,4 ,11,11,11,11,11,11,11,11,11,11,11,13,11,11,13], //state 3
   [4 ,4 ,4 ,4 ,5 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ,4 ], //state 4
   [4 ,4 ,4 ,4 ,5 ,10, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,4 ], //state 5
-  [12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,14,13,12,14], //state 6
-  [14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,13,14,14], //state 7
+  [11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,13,12,11,13], //state 6
+  [13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,12,13,13], //state 7
   //further states represent acceptance and error
 ];
 
 //declare state variables
-let state_acceptance = [8,9,10,11,12,13]
-let state_invalid = 14
+let state_acceptance = [8,9,10,11,12]
+let state_invalid = 13
 
 //declare character codes
 let char_uppercase_letter = [65,90]
@@ -210,24 +209,21 @@ function addToken(lexeme, state){
   var number = new Object();
   type = token_dict.get(state) 
   
+  if (!isKeyword(lexeme)) {
   //if valid token matches identifier rules, add to symbol table with index number
-  if(state === 8 && !isKeyword(lexeme)){
-    identifier["Entry #"] = id_index++
-    identifier["Value"] = lexeme
-    identifier_list.push(identifier)
-    token["Type"] = type      
-  }
+    if(state === 8){
+      identifier["Entry #"] = id_index++
+      identifier["Value"] = lexeme
+      identifier_list.push(identifier)      
+    }
 
-  //if valid token matches number rules, add to symbol table with index number
-  else if (state === 9 && !isKeyword(lexeme)){
-    number["Entry #"] = num_index++
-    number["Value"] = lexeme
-    token["Type"] = type
-    number_list.push(number)
-  }
-
-  //if valid token matches any other accepting state, mark as symbol adn export to token list
-  else if (state >= 10 && !isKeyword(lexeme)){        
+    //if valid token matches number rules, add to symbol table with index number
+    else if (state === 9){
+      number["Entry #"] = num_index++
+      number["Value"] = lexeme      
+      number_list.push(number)
+    }
+    //mark token types as detected
     token["Type"] = type    
   }
 
@@ -259,51 +255,53 @@ function scan() {
     }        
     
     //skip token parsing and accounting of lonely delimiters
-    if(setColumn(char) === 18 && state ===0 ){      
+    if(setColumn(char) === 18 && state === 0){      
       i++
       continue
     }
 
-    //set state to corresponding cell in transition table given a character's column number
-    state = transition_table[state][setColumn(char)]
-    
-    //avoid continuous scanning while a comment state or any state remains open/active, abort
-    if (i === file.length && !state_acceptance.includes(state)){
-      console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file.")
-      return 0
-    }
-    
-    //while the state remains active, add current char to lexeme string and advance loop
-    else if (!state_acceptance.includes(state)){                                             
+    if(state === 0 && state_acceptance.includes(transition_table[state][setColumn(char)])){
       lexeme += char
       i++
     }
-    
-    //upon reaching an acceptance state, prepare to add token to list and corresponding symbol tables
-    else if(state_acceptance.includes(state)) {      
 
-      //if state is accepting comment or symbol, add current char and avoid appending it to identifiers or numbers
-      if(state >= 10) {
-        lexeme +=char        
-      }
-      //if the lexeme is not empty, validate and tokenize the lexeme, and add to corresponding symbol tables
-      if(lexeme.length>0){        
-        addToken(lexeme, state)              
-      }
-      //if the state accepts characters that can be accepted upon input (such as with comment closers and symbols), advance the loop iterator to avoid cycling
-      if(state>=10){        
+    //set state to corresponding cell in transition table given a character's column number
+    state = transition_table[state][setColumn(char)]
+                    
+    //upon reaching an acceptance state, prepare to add token to list and corresponding symbol tables
+    if(state_acceptance.includes(state)) {           
+
+      //for states that end the lexeme upon finding accepting characters, 
+      //add the current char and advance to avoid parsing it as a single symbol
+      if(state === 10 || state === 12){
+        lexeme += char
         i++
       }
-      //reset variables
-      state = 0   
-      lexeme = ""            
+      //if the lexeme is not empty, validate and tokenize the lexeme, and add to corresponding symbol tables
+      if(lexeme.length>0){   
+        addToken(lexeme, state) 
+        state = 0
+        lexeme = ""                                     
+      }             
     }     
 
     //if state is invalid, throw error and abort
     else if(state === state_invalid) {
-      console.log("Error: Unexpected character found in lexeme: '" + lexeme + "'. Please review code.")
+      console.log("Error: Unexpected character found in lexeme: '" + lexeme + "' at position: "+i+". Please review code.")
+      return 0    
+    }      
+    
+    //avoid continuous scanning while a comment state or any state remains open/active, abort
+    else if(i===file.length && !state_acceptance.includes(state)) {
+      console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file. Possible empty file or unterminated comment.")
       return 0
-    }        
+    }    
+
+    //while the state remains active, add current char to lexeme string and advance loop
+    else {                                             
+      lexeme += char      
+      i++
+    }    
   }  
 
   //print logs regarding token, id and number tables. these can also be output to a file with fs
