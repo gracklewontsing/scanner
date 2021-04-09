@@ -2,7 +2,7 @@
 const fs = require("fs")
 
 //declare file to be read and convert it to string
-let file = fs.readFileSync("./example.cmm").toString()
+let file = fs.readFileSync("./example.cmm").toString() + " "
 
 //initialize token and symbol lists, as well as indexes for symbol lists
 var token_list = [];
@@ -209,6 +209,7 @@ function addToken(lexeme, state){
   var number = new Object();
   type = token_dict.get(state) 
   
+  //if lexeme is not keyword, proceed
   if (!isKeyword(lexeme)) {
   //if valid token matches identifier rules, add to symbol table with index number
     if(state === 8){
@@ -244,70 +245,71 @@ function scan() {
   let state = 0
   let char = ""
   let lexeme = ""
-  let i = 0
+  let i = 0  
 
   //cycle through chars in file
-  while (i < file.length) {    
-    
-    //let char be character in loop and add it to generic var while not EOF      
-    if (i<file.length) {
-      char = file[i]      
-    }        
-    
-    //skip token parsing and accounting of lonely delimiters
-    if(setColumn(char) === 18 && state === 0){      
-      i++
-      continue
-    }
+  while (i < file.length) {                             
+    char = file[i]     
 
-    if(state === 0 && state_acceptance.includes(transition_table[state][setColumn(char)])){
-      lexeme += char
-      i++
-    }
+    //given state is state 0
+    if(state === 0){
+
+      //skip token parsing and accounting of lonely delimiters
+      if(setColumn(char) === 18){      
+        i++
+        continue
+      }    
+
+      //if in base state and next state is accepting, add current char to lexeme and advance   
+      else if(state_acceptance.includes(transition_table[state][setColumn(char)])){
+        lexeme += char
+        i++
+      }
+    }     
+
+    //if state is invalid, throw error and abort
+    else if(state === state_invalid) {      
+      console.log("Error: Unexpected character found in lexeme: '" + lexeme + "' at position: "+i+". Please review code.")
+      return 0    
+    }  
 
     //set state to corresponding cell in transition table given a character's column number
-    state = transition_table[state][setColumn(char)]
-                    
+    state = transition_table[state][setColumn(char)]                           
+
     //upon reaching an acceptance state, prepare to add token to list and corresponding symbol tables
     if(state_acceptance.includes(state)) {           
-
       //for states that end the lexeme upon finding accepting characters, 
       //add the current char and advance to avoid parsing it as a single symbol
       if(state === 10 || state === 12){
         lexeme += char
         i++
       }
+
       //if the lexeme is not empty, validate and tokenize the lexeme, and add to corresponding symbol tables
       if(lexeme.length>0){   
         addToken(lexeme, state) 
         state = 0
         lexeme = ""                                     
       }             
-    }     
+      continue
+    }                 
 
-    //if state is invalid, throw error and abort
-    else if(state === state_invalid) {
-      console.log("Error: Unexpected character found in lexeme: '" + lexeme + "' at position: "+i+". Please review code.")
-      return 0    
-    }      
-    
-    //avoid continuous scanning while a comment state or any state remains open/active, abort
-    else if(i===file.length && !state_acceptance.includes(state)) {
-      console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file. Possible empty file or unterminated comment.")
-      return 0
-    }    
+    //while the state remains active, add current char to lexeme string and advance loop                                              
+    lexeme += char          
+    i++              
+  }    
 
-    //while the state remains active, add current char to lexeme string and advance loop
-    else {                                             
-      lexeme += char      
-      i++
-    }    
-  }  
-
-  //print logs regarding token, id and number tables. these can also be output to a file with fs
+  //avoid continuous scanning while a comment state or any state remains open/active, abort
+  if(i===file.length && state === 4) {
+    console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file. Possible empty file or unterminated comment.")
+    return 0
+  } 
+  
+  //print logs regarding token, id and number tables, and also output to a file with fs
   console.log(token_list)
-  console.log(identifier_list)
-  console.log(number_list)
+  fs.writeFileSync("./table_id.json", JSON.stringify(identifier_list))
+  fs.writeFileSync("./table_num.json", JSON.stringify(number_list))
+  fs.writeFileSync("./table_token.json", JSON.stringify(token_list))
 }
 
 //export scanning function to main.js or any other
