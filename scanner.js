@@ -300,8 +300,8 @@ function scan() {
   }    
 
   //avoid continuous scanning while a comment state or any state remains open/active, abort
-  if(i===file.length && state === 4) {
-    console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file. Possible empty file or unterminated comment.")
+  if(i===file.length && state === 4 || state=== state_invalid) {
+    console.log("ERROR: Token unable to terminate scanning. Please check for comments or errors within the file. Possible empty file, unterminated comment or invalid character at EOF.")
     return 0
   } 
   
